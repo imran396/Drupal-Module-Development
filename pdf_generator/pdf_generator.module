@@ -1,0 +1,279 @@
+<?php
+function pdf_generator_node_info()
+{
+    return array(
+        'pdf_generator' => array(
+            'name' => t('Pdf Node Type'),
+            'base' => 'pdf_generator',
+            'description' => t('This is an pdf node type with a few fields.'),
+            'title_label' => t('Name'),
+            'locked' => true,
+        ),
+    );
+}
+
+
+function pdf_generator_node_type_insert($content_type)
+{
+    if ($content_type->type == 'pdf_generator') {
+
+        foreach (pdf_generator_installed_fields() as $field) {
+            field_create_field($field);
+        }
+
+        foreach (pdf_generator_installed_instances() as $instance) {
+            $instance['entity_type'] = 'node';
+            $instance['bundle'] = 'pdf_generator';
+            field_create_instance($instance);
+        }
+    }
+}
+
+
+function pdf_generator_form($node, $form_state)
+{
+    return node_content_form($node, $form_state);
+}
+
+
+function pdf_generator_form_alter(&$form, &$form_state, $form_id)
+{
+
+    if ($form_id == 'pdf_generator_node_form') {
+        $form['additional_settings']['#access'] = false;
+        unset($form['body']);
+
+    }
+}
+
+function pdf_generator_node_presave($node)
+{
+    if ($node->type == 'pdf_generator') {
+        ;
+    }
+    $node->status = 1;
+}
+
+
+function pdf_generator_installed_fields()
+{
+    return array(
+        'pdf_generator_phone_number' => array(
+            'field_name' => 'pdf_generator_phone_number',
+            'cardinality' => 1,
+            'type' => 'text',
+            'settings' => array(
+                'max_length' => 60,
+            ),
+        ),
+        'pdf_generator_home_city' => array(
+            'field_name' => 'pdf_generator_home_city',
+            'cardinality' => 1,
+            'type' => 'text',
+            'settings' => array(
+                'max_length' => 60,
+            ),
+        ),
+        'pdf_generator_gender_checkboxes' => array(
+            'field_name' => 'pdf_generator_gender_checkboxes',
+            'type' => 'list_integer',
+            'cardinality' => '1', // change this to 1 to get radio buttons instead
+            'foreign keys' => array(),
+            'indexes' => array(
+                'value' => array(
+                    0 => 'value',
+                ),
+            ),
+            'module' => 'list',
+            'settings' => array(
+                'allowed_values_function' => '_pdf_generator_gender_checkboxes_options_list',
+            )
+        )
+    );
+}
+
+
+function pdf_generator_installed_instances()
+{
+    return array(
+        'pdf_generator_phone_number' => array(
+            'field_name' => 'pdf_generator_phone_number',
+            'label' => t('Phone Number.'),
+            'widget' => array(
+                'type' => 'text_textfield',
+            ),
+            'required' => 1,
+            'display' => array(
+                'default' => array(
+                    'type' => 'text_default',
+                    'label' => 'hidden',
+                ),
+            ),
+        ),
+        'pdf_generator_home_city' => array(
+            'field_name' => 'pdf_generator_home_city',
+            'label' => t('Home City.'),
+            'widget' => array(
+                'type' => 'text_textfield',
+            ),
+            'required' => 1,
+            'display' => array(
+                'default' => array(
+                    'type' => 'text_default',
+                    'label' => 'hidden',
+                ),
+            ),
+        ),
+        'pdf_generator_gender_checkboxes' => array(
+            'field_name' => 'pdf_generator_gender_checkboxes',
+            'label' => t('Gender'),
+            'default_value' => null, // add a default value here that matches your key => index values
+            'display' => array(
+                'default' => array(
+                    'label' => 'above',
+                    'module' => 'list',
+                    'settings' => array(),
+                    'type' => 'list_default',
+                    'weight' => -1,
+                ),
+                'teaser' => array(
+                    'label' => 'above',
+                    'settings' => array(),
+                    'type' => 'hidden',
+                    'weight' => -1,
+                ),
+            ),
+            'required' => 1,
+            'settings' => array(
+                'user_register_form' => false,
+            ),
+            'widget' => array(
+                'active' => 1,
+                'module' => 'options',
+                'settings' => array(),
+                'type' => 'options_buttons',
+                'weight' => '-1',
+            ),
+        )
+    );
+}
+
+function  pdf_generator_user_login(&$edit, $account)
+{
+    $_GET['destination'] = 'node/add/pdf-generator';
+
+}
+
+
+function _pdf_generator_gender_checkboxes_options_list()
+{
+    $options = array(
+        1 => ' Male',
+        2 => 'Female'
+    );
+
+    return $options;
+}
+
+
+function pdf_generator_menu()
+{
+    $items['pdf/generate'] = array(
+        'page callback' => 'pdf_generator',
+        'type' => MENU_CALLBACK,
+        'access callback' => true,
+    );
+
+    return $items;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function pdf_generator_theme()
+{
+    $theme_hooks = array(
+        'pdf_email' => array(
+            'template' => 'user-pdf-email',
+            'variables' => array('data' => null),
+        )
+    );
+
+    return $theme_hooks;
+}
+
+function pdf_generator()
+{
+
+    if (!file_exists(drupal_get_path('module', 'pdf_generator') . '/dompdf/dompdf_config.inc.php')) {
+        drupal_set_message(t('Dompdf did not found!'));
+
+        return;
+    }
+    global $base_url;
+
+    if (drupal_valid_token($_POST['token'], 'zxyxfsrffggt')) {
+        $node_obj = node_load($_POST['nodeId']);
+
+        require_once drupal_get_path('module', 'pdf_generator') . '/dompdf/dompdf_config.inc.php';
+
+        $pdfTemplate = theme('pdf_email', array('data' => $node_obj));
+
+
+        $dompdf = new DOMPDF();
+        $dompdf->load_html((string)$pdfTemplate);
+        $dompdf->render();
+
+
+        if (!headers_sent() && isset($_POST['generatePdf'])) {
+            $dompdf->stream('sampleForm.pdf',array('Attachment'=>0));
+
+        } else {
+
+            $pdfName = 'user_pdf_email_' . rand(97, 122) . '.pdf';
+            $pdfPath = file_create_filename($pdfName, drupal_get_path('module', 'pdf_generator') . '/tempPdf');
+
+
+            if ($pdfPath) {
+                $htmlData = $dompdf->output();
+                file_put_contents($pdfPath, $htmlData);
+            }
+
+            global $language;
+
+            $site_email_address = variable_get('site_mail', 'imran3968@gmail.com');
+
+           $mailsentFlag =  drupal_mail(
+                'pdf_generator',
+                '',
+                $_POST['email'],
+                $language,
+                $params = array('filecontent' => $pdfPath),
+                $site_email_address
+            );
+
+            if($mailsentFlag){
+                unlink($pdfPath);
+                drupal_goto($base_url . '/admin/content');
+            }
+        }
+  }
+
+
+}
+
+
+function pdf_generator_mail($key, &$message, $params)
+{
+    $fileContent = file_get_contents($params['filecontent']);
+    $attachment = array(
+        'filecontent' => $fileContent,
+        'filename' => 'file.pdf',
+        'filemime' => 'application/pdf'
+    );
+
+    $message['subject'] = 'Hello Testing';
+    $message['body'][] = 'Please Check The Attache Pdf File';
+    $message['params']['attachments'][] = $attachment;
+
+}
