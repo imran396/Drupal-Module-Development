@@ -1,0 +1,87 @@
+<?php
+
+function newsnet_articles_api_menu()
+{
+
+    $items['articlesV1/api/%/%'] = array(
+        'page callback' => 'getArticlesList',
+        'page arguments' => array(2, 3),
+        'access callback' => 'user_access',
+        'access arguments' => array('access content'),
+        'file' => 'generatexml.pages.inc',
+    );
+
+    return $items;
+
+}
+
+
+function  getArticlesList( $startDate, $endDate)
+{
+    $startDateTimestamp =  strtotime($startDate);
+    $endDateTimeStamp =    strtotime($endDate);
+    //check valid date
+    check_valid_date( $startDateTimestamp, $endDateTimeStamp);
+
+    //pull all node id from db using start date and end date
+    $nodes = getArictlesNodes($startDate, $endDate);
+
+    $xml_obj =  new generateXml($nodes);
+
+    // let's started train just change version number you will get version wise xml out
+
+    print($xml_obj->xmlOutPut('v1')) ;
+    exit;
+
+}
+
+
+function check_valid_date($startDate,$endDate){
+
+
+    if(!isset($startDate)){
+        throw new Exception('Start Date field is required');
+    }
+
+     if(!isset($endDate)){
+        throw new Exception('End Date field is required');
+    }
+
+    if($startDate > $endDate){
+        throw new Exception('Start date field is must smaller than End date field');
+    }
+
+    return true;
+
+}
+
+function getArictlesNodes($startDate, $endDate){
+
+    $endDate = date('Y-m-d',strtotime($endDate.' + 1 day'));
+
+    $query = "
+			SELECT
+				n.nid
+			FROM
+				{node} n
+			LEFT JOIN
+				{content_type_article} article ON article.nid = n.nid
+			WHERE
+				n.type = 'article'
+			AND article.field_publish_date_value BETWEEN '$startDate' AND '$endDate'
+
+			ORDER BY
+				article.field_publish_date_value DESC
+		";
+
+    $results =  db_query($query);
+
+    $articles = array();
+            while ($article = db_fetch_object($results)) {
+                $articles[] = $article;
+            }
+
+            return $articles;
+    }
+
+
