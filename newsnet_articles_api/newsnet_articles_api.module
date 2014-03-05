@@ -8,7 +8,7 @@ function newsnet_articles_api_menu()
         'page arguments' => array(2, 3),
         'access callback' => 'user_access',
         'access arguments' => array('access content'),
-        'file' => 'generatexml.pages.inc',
+        'file' => 'generatexml.cls.inc',
     );
 
     return $items;
