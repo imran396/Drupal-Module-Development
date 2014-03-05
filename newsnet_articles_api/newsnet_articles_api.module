@@ -28,8 +28,8 @@ function  getArticlesList( $startDate, $endDate)
 
     $xml_obj =  new generateXml($nodes);
 
+    header("Content-Type: text/plain");
     // let's started train just change version number you will get version wise xml out
-
     print($xml_obj->xmlOutPut('v1')) ;
     exit;
 
@@ -76,12 +76,12 @@ function getArictlesNodes($startDate, $endDate){
 
     $results =  db_query($query);
 
-    $articles = array();
-            while ($article = db_fetch_object($results)) {
-                $articles[] = $article;
+    $articlesNodeId = array();
+            while ($articleNid = db_fetch_object($results)) {
+                $articlesNodeId[] = $articleNid;
             }
 
-            return $articles;
+            return $articlesNodeId;
     }
 
 

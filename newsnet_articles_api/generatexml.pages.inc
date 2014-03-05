@@ -2,10 +2,10 @@
 
 class generateXml{
 
-    private $ArticlesNids;
+    private $articlesNids;
 
     public function __construct(array $artcleNodes){
-        $this->ArticlesNids =  $artcleNodes;
+        $this->articlesNids =  $artcleNodes;
     }
 
     public function xmlOutPut($version = null){
@@ -20,13 +20,13 @@ class generateXml{
 
     public function generatexmlV1(){
 
-    header("Content-Type: text/plain");
+
     $xmlDoc = new DOMDocument(1.0,'UTF-8');
     //create the root element
 	$root = $xmlDoc->createElement("articles");
     $xmlDoc->appendChild($root);
 
-      foreach ($this->ArticlesNids as $node) {
+      foreach ($this->articlesNids as $node) {
 
         $node = node_load($node->nid);
 		$article = $xmlDoc->createElement("article");
