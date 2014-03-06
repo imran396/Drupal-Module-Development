@@ -1,0 +1,9 @@
+; $Id:
+name = Visitor Flag Counter
+description = "Visitor Flag Counter"
+core = 7.x
+
+version = "7.x-1.0"
+core = "7.x"
+
+

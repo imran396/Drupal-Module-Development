@@ -1,0 +1,210 @@
+<?php
+require_once 'src/Google_Client.php';
+require_once 'src/contrib/Google_AnalyticsService.php';
+require_once 'GoogleAnalyticsHelper.php';
+
+
+function visitor_flag_counter_menu()
+{
+    $items['visitor/analytics'] = array(
+        'page callback' => 'pull_analytics_data',
+        'access callback' => TRUE,
+        'type'            => MENU_CALLBACK,
+    );
+
+    return $items;
+}
+
+function visitor_flag_counter_theme(){
+    return array(
+        'visitorsTpl' => array(
+            'variables' => array('data' => NULL),
+            'template' => 'visitors-template'
+        ),
+    );
+}
+
+function visitor_flag_counter_block_info()
+{
+    $blocks['country_flag'] = array(
+        'info' => t('Country flag')
+    );
+
+    return $blocks;
+}
+
+/**
+ * Implementation of hook_block_view().
+ */
+function visitor_flag_counter_block_view($delta='')
+{
+    $block = array();
+    switch ($delta) {
+        case 'country_flag':
+            $block['subject'] = t('Country Wise Visitors');
+            $block['content'] = country_flag_data();
+            break;
+    }
+    return $block;
+}
+
+/**
+ * custom html block
+ * @return string
+ */
+function country_flag_data()
+{
+    $data = getAnalyticsData();
+    $contry_data = json_decode($data['json_value']);
+
+
+    foreach($contry_data as $key => $country){
+
+        $data_country[$key]['code'] = getGetCountryCode(strtoupper($country[0]));
+        $data_country[$key]['total_visit'] = $country[1];
+        $data_country[$key]['name'] = $country[0];
+    }
+
+
+    return theme('visitorsTpl', array('data'=>$data_country));
+}
+
+/**
+ * @return mixed
+ */
+
+function pull_analytics_data()
+{
+
+    $client = getClient();
+    $service = getService();
+
+    if(isset($_GET['code'])){
+
+        $authenticateJson = $client->authenticate();
+        $authenticate = (json_decode($authenticateJson));
+        insertGoogleApiInfo($authenticate);
+        $token = getGoogleApiToken();
+
+        $Lasttoken = array(
+            'access_token' => $token['token'],
+            'token_type' => 'Bearer',
+            'expires_in' => '3600',
+            'refresh_token' => $token['refresh_token'],
+            'created' => $token['created']
+        );
+
+        $tokenJson = json_encode($Lasttoken);
+        $client->setAccessToken($tokenJson);
+        $accounts = GoogleAnalyticsHelper::getAccounts($service);
+        $profile = GoogleAnalyticsHelper::getProfile($accounts[0]['accountId'], $service);
+        $result = GoogleAnalyticsHelper::getCountryStats($profile[0]['id'], $service);
+        vistorsParseAndInsertIntoDb(json_encode($result['rows']));
+
+    }else{
+        $authUrl = $client->createAuthUrl();
+        print "<a class='login' href='$authUrl'>Connect Me!</a>";
+    }
+}
+
+function vistorsParseAndInsertIntoDb($rows)
+{
+    insertVisiorsData($rows);
+}
+
+/**
+ * @return Google_Client
+ */
+
+function getClient()
+{
+    global $base_url;
+    $client = new Google_Client();
+    $client->setApplicationName("My Awesome App");
+    $client->setClientId('311475077754.apps.googleusercontent.com');
+    $client->setClientSecret('WvlP2rsPWXsbE_Yan9K8OhJ0');
+    $client->setRedirectUri('http://localhost/education-portal/visitor/analytics');
+    $client->setDeveloperKey('AIzaSyB6eKN6FPUaowt1cb_a3dvvpJaQyaYcaOg');
+    $client->setScopes(array('https://www.googleapis.com/auth/analytics.readonly'));
+
+    return $client;
+}
+
+function getService()
+{
+    $client = getClient();
+    $service = new Google_AnalyticsService($client);
+    return $service;
+}
+
+/**
+ * insert Google api token
+ */
+
+function insertGoogleApiInfo($authenticate)
+{
+    $token = $authenticate->access_token;
+    $refresh_token = $authenticate->refresh_token;
+    $created = $authenticate->created;
+
+    db_update('google_anlytics_api_info') // Table name no longer needs {}
+        ->fields(array(
+            'id'     => 1,
+            'token' => $token,
+            'refresh_token' => $refresh_token,
+            'created' => $created,
+        ))
+        ->execute();
+}
+
+function getGoogleApiToken()
+{
+    $result = db_select('google_anlytics_api_info', 'ga')
+        ->fields('ga')
+        ->condition('id', 1)
+        ->execute()
+        ->fetchAssoc();
+    return $result;
+}
+
+function insertVisiorsData($countryVisitJson)
+{
+    db_update('google_anlytics_visitors')
+        ->fields(array(
+            'json_value' => $countryVisitJson,
+
+        ))
+        ->condition('id', 1)
+        ->execute();
+}
+
+function getAnalyticsData()
+{
+    $result = db_select('google_anlytics_visitors', 'ga')
+        ->fields('ga',array('json_value'))
+        ->execute()
+        ->fetchAssoc();
+
+    return $result;
+}
+
+function getGetCountryCode($country_name = null){
+    $result = db_select('country_code', 'c')
+        ->fields('c',array('code'))
+        ->condition('country',$country_name)
+        ->execute()
+        ->fetchField();
+
+    return $result;
+}
+
+
+function format_number($number)
+{
+    if($number >= 1000) {
+        return round(($number/1000), 2) ."k";
+    }
+    else {
+        return $number;
+    }
+}
